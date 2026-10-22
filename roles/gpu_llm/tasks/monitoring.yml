@@ -1,0 +1,17 @@
+- name: Download GPU exporter
+  ansible.builtin.get_url:
+    url: https://github.com/utkuozdemir/nvidia_gpu_exporter/releases/download/v{{ gpu_llm_gpu_exporter_version }}/{{ __gpu_llm_exporter_deb }}
+    dest: /var/cache/apt/archives/{{ __gpu_llm_exporter_deb }}
+    checksum: sha256:{{ gpu_llm_gpu_exporter_sha256 }}
+    mode: "0644"
+
+- name: Install GPU exporter
+  ansible.builtin.apt:
+    deb: /var/cache/apt/archives/{{ __gpu_llm_exporter_deb }}
+    lock_timeout: 600
+
+- name: Enable GPU exporter
+  ansible.builtin.systemd_service:
+    name: nvidia_gpu_exporter
+    enabled: true
+    state: started

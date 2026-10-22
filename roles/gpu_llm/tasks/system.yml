@@ -1,0 +1,35 @@
+- name: Check required variables
+  ansible.builtin.assert:
+    that:
+      - ansible_facts['distribution'] == 'Ubuntu'
+      - gpu_llm_api_key | length >= 32
+    fail_msg: Ubuntu is required and gpu_llm_api_key must be at least 32 characters long.
+    quiet: true
+
+- name: Upgrade system packages
+  ansible.builtin.apt:
+    upgrade: dist
+    update_cache: true
+    cache_valid_time: 3600
+    lock_timeout: 600
+  when: gpu_llm_system_upgrade | bool
+
+- name: Install python3-debian for deb822 repositories
+  ansible.builtin.apt:
+    name: python3-debian
+    lock_timeout: 600
+
+- name: Check if reboot is required
+  ansible.builtin.stat:
+    path: /var/run/reboot-required
+  register: __gpu_llm_reboot_required
+
+- name: Reboot into new kernel
+  ansible.builtin.reboot:
+    reboot_timeout: "{{ gpu_llm_reboot_timeout }}"
+  when: __gpu_llm_reboot_required.stat.exists
+
+- name: Refresh facts after reboot
+  ansible.builtin.setup:
+    gather_subset: [min]
+  when: __gpu_llm_reboot_required.stat.exists

@@ -1,0 +1,52 @@
+- name: Create directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: /etc/gpu-llm, mode: "0700" }
+    - { path: "{{ __gpu_llm_hf_cache }}", mode: "0755" }
+    - { path: "{{ __gpu_llm_vllm_cache }}", mode: "0755" }
+
+- name: Write vLLM environment file
+  ansible.builtin.template:
+    src: vllm.env.j2
+    dest: "{{ __gpu_llm_env_file }}"
+    mode: "0600"
+  no_log: true
+  notify: gpu_llm_restart_vllm
+
+- name: Pull vLLM image
+  ansible.builtin.command:
+    argv: [docker, pull, "{{ gpu_llm_vllm_image }}"]
+  register: __gpu_llm_pull
+  changed_when: "'Image is up to date' not in __gpu_llm_pull.stdout"
+  notify: gpu_llm_restart_vllm
+
+- name: Check GPU access from container
+  ansible.builtin.command:
+    argv: [docker, run, --rm, --gpus, all, --entrypoint, nvidia-smi, "{{ gpu_llm_vllm_image }}", -L]
+  changed_when: false
+
+- name: Download model
+  ansible.builtin.command:
+    argv: "{{ __gpu_llm_download_cmd }}"
+    creates: "{{ __gpu_llm_model_snapshot }}/config.json"
+  async: 7200
+  poll: 30
+
+- name: Install vLLM systemd unit
+  ansible.builtin.template:
+    src: vllm.service.j2
+    dest: /etc/systemd/system/vllm.service
+    mode: "0644"
+  notify: gpu_llm_restart_vllm
+
+- name: Restart vLLM if configuration changed
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable vLLM
+  ansible.builtin.systemd_service:
+    name: vllm
+    enabled: true
+    state: started

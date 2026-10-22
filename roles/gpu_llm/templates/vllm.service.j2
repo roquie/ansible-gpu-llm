@@ -1,0 +1,25 @@
+[Unit]
+Description=vLLM OpenAI-compatible API
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStartPre=-/usr/bin/docker rm --force vllm
+ExecStart=/usr/bin/docker run --rm --name vllm \
+  --gpus all \
+  --ipc host \
+  -p 127.0.0.1:{{ gpu_llm_vllm_port }}:8000 \
+  --env-file {{ __gpu_llm_env_file }} \
+  -e HF_HUB_OFFLINE=1 \
+  -v {{ __gpu_llm_hf_cache }}:/root/.cache/huggingface \
+  -v {{ __gpu_llm_vllm_cache }}:/root/.cache/vllm \
+  {{ gpu_llm_vllm_image }} \
+  {{ __gpu_llm_vllm_args | map('string') | join(' ') }}
+ExecStop=/usr/bin/docker stop --time 60 vllm
+Restart=always
+RestartSec=15
+TimeoutStopSec=90
+
+[Install]
+WantedBy=multi-user.target

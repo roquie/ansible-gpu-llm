@@ -1,0 +1,33 @@
+limit_req_zone $binary_remote_addr zone=gpu_llm:10m rate={{ gpu_llm_api_rate_limit }};
+limit_req_status 429;
+
+server {
+    listen {{ gpu_llm_api_port }};
+    server_tokens off;
+    client_max_body_size 10m;
+
+    location /v1/ {
+        limit_req zone=gpu_llm burst={{ gpu_llm_api_rate_burst }} nodelay;
+        proxy_pass http://127.0.0.1:{{ gpu_llm_vllm_port }};
+        proxy_http_version 1.1;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_buffering off;
+        proxy_read_timeout 600s;
+    }
+
+    location = /health {
+        proxy_pass http://127.0.0.1:{{ gpu_llm_vllm_port }};
+    }
+
+    location = /metrics {
+{% for source in gpu_llm_metrics_allowed %}
+        allow {{ source }};
+{% endfor %}
+        deny all;
+        proxy_pass http://127.0.0.1:{{ gpu_llm_vllm_port }};
+    }
+
+    location / {
+        return 404;
+    }
+}

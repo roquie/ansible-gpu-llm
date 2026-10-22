@@ -1,0 +1,38 @@
+- name: Wait for model to load
+  ansible.builtin.uri:
+    url: http://127.0.0.1:{{ gpu_llm_vllm_port }}/health
+  register: __gpu_llm_health
+  until: __gpu_llm_health.status == 200
+  retries: 90
+  delay: 10
+
+- name: Check that API requires a key
+  ansible.builtin.uri:
+    url: http://127.0.0.1:{{ gpu_llm_api_port }}/v1/models
+    status_code: [401]
+
+- name: Send test request
+  ansible.builtin.uri:
+    url: http://127.0.0.1:{{ gpu_llm_api_port }}/v1/chat/completions
+    method: POST
+    headers:
+      Authorization: Bearer {{ gpu_llm_api_key }}
+    body_format: json
+    body:
+      model: "{{ gpu_llm_served_model_name }}"
+      messages:
+        - role: user
+          content: "Reply with one word: OK"
+      max_tokens: 256
+    timeout: 120
+  register: __gpu_llm_test
+  no_log: true
+
+- name: Show test response
+  ansible.builtin.debug:
+    msg: "{{ __gpu_llm_test.json['choices'][0]['message'] }}"
+
+- name: Check GPU exporter
+  ansible.builtin.uri:
+    url: http://127.0.0.1:9835/metrics
+  when: gpu_llm_gpu_exporter_enabled | bool

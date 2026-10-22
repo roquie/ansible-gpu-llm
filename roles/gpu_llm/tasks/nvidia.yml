@@ -1,0 +1,70 @@
+- name: Disable nouveau
+  ansible.builtin.copy:
+    dest: /etc/modprobe.d/blacklist-nouveau.conf
+    content: |
+      blacklist nouveau
+      options nouveau modeset=0
+    mode: "0644"
+  notify:
+    - gpu_llm_update_initramfs
+    - gpu_llm_reboot
+
+- name: Install NVIDIA driver
+  ansible.builtin.apt:
+    name: "{{ __gpu_llm_driver_packages }}"
+    install_recommends: false
+    allow_change_held_packages: true
+    update_cache: true
+    cache_valid_time: 3600
+    lock_timeout: 600
+  notify: gpu_llm_reboot
+
+- name: Hold NVIDIA driver packages
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop: "{{ __gpu_llm_driver_packages }}"
+
+- name: Keep unattended-upgrades away from driver and kernel
+  ansible.builtin.copy:
+    dest: /etc/apt/apt.conf.d/51gpu-llm
+    content: |
+      Unattended-Upgrade::Package-Blacklist {
+          "nvidia-";
+          "libnvidia-";
+          "linux-";
+      };
+    mode: "0644"
+
+- name: Create nvidia-persistenced drop-in directory
+  ansible.builtin.file:
+    path: /etc/systemd/system/nvidia-persistenced.service.d
+    state: directory
+    mode: "0755"
+
+- name: Enable GPU persistence mode
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/nvidia-persistenced.service.d/persistence-mode.conf
+    content: |
+      [Service]
+      ExecStart=
+      ExecStart=/usr/bin/nvidia-persistenced --user nvidia-persistenced --persistence-mode --verbose
+    mode: "0644"
+  notify: gpu_llm_restart_persistenced
+
+- name: Reboot if driver changed
+  ansible.builtin.meta: flush_handlers
+
+- name: Check driver
+  ansible.builtin.command:
+    argv:
+      - nvidia-smi
+      - --query-gpu=name,driver_version,memory.total,persistence_mode
+      - --format=csv,noheader
+  register: __gpu_llm_smi
+  changed_when: false
+  check_mode: false
+
+- name: Show GPUs
+  ansible.builtin.debug:
+    var: __gpu_llm_smi.stdout_lines

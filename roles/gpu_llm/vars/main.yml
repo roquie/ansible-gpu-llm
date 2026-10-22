@@ -1,0 +1,53 @@
+__gpu_llm_driver_suffix: "{{ '-open' if gpu_llm_nvidia_driver_open | bool else '' }}"
+__gpu_llm_driver_packages:
+  - linux-modules-nvidia-{{ gpu_llm_nvidia_driver_branch }}-server{{ __gpu_llm_driver_suffix }}-{{ ansible_facts['kernel'] }}
+  - nvidia-headless-no-dkms-{{ gpu_llm_nvidia_driver_branch }}-server{{ __gpu_llm_driver_suffix }}
+  - nvidia-utils-{{ gpu_llm_nvidia_driver_branch }}-server
+
+__gpu_llm_docker_packages:
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io
+  - docker-buildx-plugin
+  - docker-compose-plugin
+
+__gpu_llm_toolkit_packages:
+  - nvidia-container-toolkit
+  - nvidia-container-toolkit-base
+  - libnvidia-container-tools
+  - libnvidia-container1
+
+__gpu_llm_docker_daemon:
+  runtimes:
+    nvidia:
+      path: nvidia-container-runtime
+      args: []
+  log-driver: json-file
+  log-opts:
+    max-size: 50m
+    max-file: "3"
+  registry-mirrors: "{{ gpu_llm_docker_registry_mirrors }}"
+
+__gpu_llm_exporter_deb: nvidia-gpu-exporter_{{ gpu_llm_gpu_exporter_version }}_linux_amd64.deb
+
+__gpu_llm_env_file: /etc/gpu-llm/vllm.env
+__gpu_llm_hf_cache: "{{ gpu_llm_data_dir }}/huggingface"
+__gpu_llm_vllm_cache: "{{ gpu_llm_data_dir }}/vllm-cache"
+__gpu_llm_model_snapshot: "{{ __gpu_llm_hf_cache }}/hub/models--{{ gpu_llm_model | replace('/', '--') }}/snapshots/{{ gpu_llm_model_revision }}"
+
+__gpu_llm_download_cmd: >-
+  {{ ['/usr/bin/docker', 'run', '--rm', '--env-file', __gpu_llm_env_file,
+      '-v', __gpu_llm_hf_cache ~ ':/root/.cache/huggingface',
+      '--entrypoint', 'hf', gpu_llm_vllm_image,
+      'download', gpu_llm_model, '--revision', gpu_llm_model_revision]
+     + gpu_llm_model_download_exclude | map('regex_replace', '^', '--exclude=') | list }}
+
+__gpu_llm_vllm_args: >-
+  {{ [gpu_llm_model,
+      '--revision', gpu_llm_model_revision,
+      '--served-model-name', gpu_llm_served_model_name,
+      '--tensor-parallel-size', gpu_llm_tensor_parallel_size,
+      '--max-model-len', gpu_llm_max_model_len,
+      '--max-num-seqs', gpu_llm_max_num_seqs,
+      '--gpu-memory-utilization', gpu_llm_gpu_memory_utilization]
+     + gpu_llm_vllm_extra_args }}

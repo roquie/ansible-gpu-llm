@@ -1,0 +1,20 @@
+- name: Install nginx
+  ansible.builtin.apt:
+    name: nginx
+    lock_timeout: 600
+
+- name: Remove default nginx site
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: gpu_llm_reload_nginx
+
+- name: Configure API proxy
+  ansible.builtin.template:
+    src: nginx-gpu-llm.conf.j2
+    dest: /etc/nginx/conf.d/gpu-llm.conf
+    mode: "0644"
+  notify: gpu_llm_reload_nginx
+
+- name: Apply nginx configuration
+  ansible.builtin.meta: flush_handlers

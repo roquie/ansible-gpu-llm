@@ -1,0 +1,35 @@
+gpu_llm_system_upgrade: true
+gpu_llm_reboot_timeout: 900
+
+gpu_llm_nvidia_driver_branch: "580"
+gpu_llm_nvidia_driver_open: true
+gpu_llm_docker_registry_mirrors: []
+
+gpu_llm_data_dir: /srv/gpu-llm
+gpu_llm_vllm_image: vllm/vllm-openai:v0.32.0
+gpu_llm_model: openai/gpt-oss-safeguard-20b
+gpu_llm_model_revision: 8a11e17b25c973a24099d4016bf2e17dd7ec1574
+gpu_llm_model_download_exclude:
+  - original/*
+  - metal/*
+gpu_llm_served_model_name: gpt-oss-safeguard-20b
+gpu_llm_tensor_parallel_size: 1
+gpu_llm_max_model_len: 32768
+gpu_llm_max_num_seqs: 32
+gpu_llm_gpu_memory_utilization: 0.9
+gpu_llm_vllm_extra_args:
+  - --reasoning-parser
+  - openai_gptoss
+gpu_llm_hf_token: ""
+gpu_llm_api_key: ""
+
+gpu_llm_vllm_port: 8001
+gpu_llm_api_port: 8000
+gpu_llm_api_rate_limit: 20r/s
+gpu_llm_api_rate_burst: 40
+gpu_llm_metrics_allowed:
+  - 127.0.0.1
+
+gpu_llm_gpu_exporter_enabled: true
+gpu_llm_gpu_exporter_version: 1.15.1
+gpu_llm_gpu_exporter_sha256: 0dc8c2756c6853ec7e6a7c404b229d8f764443bef89f33e13b3c4278b309acd4

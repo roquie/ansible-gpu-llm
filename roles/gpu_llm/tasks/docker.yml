@@ -1,0 +1,50 @@
+- name: Add Docker repository
+  ansible.builtin.deb822_repository:
+    name: docker
+    types: [deb]
+    uris: [https://download.docker.com/linux/ubuntu]
+    suites: ["{{ ansible_facts['distribution_release'] }}"]
+    components: [stable]
+    architectures: [amd64]
+    signed_by: https://download.docker.com/linux/ubuntu/gpg
+  notify: gpu_llm_apt_update
+
+- name: Add NVIDIA Container Toolkit repository
+  ansible.builtin.deb822_repository:
+    name: nvidia-container-toolkit
+    types: [deb]
+    uris: [https://nvidia.github.io/libnvidia-container/stable/deb/amd64/]
+    suites: [/]
+    signed_by: https://nvidia.github.io/libnvidia-container/gpgkey
+  notify: gpu_llm_apt_update
+
+- name: Update package index
+  ansible.builtin.meta: flush_handlers
+
+- name: Install Docker and NVIDIA Container Toolkit
+  ansible.builtin.apt:
+    name: "{{ __gpu_llm_docker_packages + __gpu_llm_toolkit_packages }}"
+    lock_timeout: 600
+
+- name: Hold NVIDIA Container Toolkit packages
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop: "{{ __gpu_llm_toolkit_packages }}"
+
+- name: Configure Docker daemon
+  ansible.builtin.copy:
+    dest: /etc/docker/daemon.json
+    content: "{{ __gpu_llm_docker_daemon | to_nice_json }}\n"
+    mode: "0644"
+    validate: dockerd --validate --config-file %s
+  notify: gpu_llm_restart_docker
+
+- name: Apply Docker configuration
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable Docker
+  ansible.builtin.systemd_service:
+    name: docker
+    enabled: true
+    state: started

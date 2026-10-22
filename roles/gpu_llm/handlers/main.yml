@@ -1,0 +1,48 @@
+- name: Update initramfs
+  ansible.builtin.command:
+    argv: [update-initramfs, -u]
+  changed_when: true
+  listen: gpu_llm_update_initramfs
+
+- name: Reboot
+  ansible.builtin.reboot:
+    reboot_timeout: "{{ gpu_llm_reboot_timeout }}"
+  listen: gpu_llm_reboot
+
+- name: Restart nvidia-persistenced
+  ansible.builtin.systemd_service:
+    name: nvidia-persistenced
+    state: restarted
+    daemon_reload: true
+  listen: gpu_llm_restart_persistenced
+
+- name: Update package index
+  ansible.builtin.apt:
+    update_cache: true
+    lock_timeout: 600
+  listen: gpu_llm_apt_update
+
+- name: Restart Docker
+  ansible.builtin.systemd_service:
+    name: docker
+    state: restarted
+  listen: gpu_llm_restart_docker
+
+- name: Restart vLLM
+  ansible.builtin.systemd_service:
+    name: vllm
+    state: restarted
+    daemon_reload: true
+  listen: gpu_llm_restart_vllm
+
+- name: Test nginx configuration
+  ansible.builtin.command:
+    argv: [nginx, -t]
+  changed_when: false
+  listen: gpu_llm_reload_nginx
+
+- name: Reload nginx
+  ansible.builtin.systemd_service:
+    name: nginx
+    state: reloaded
+  listen: gpu_llm_reload_nginx

@@ -1,0 +1,29 @@
+- name: Prepare system
+  ansible.builtin.import_tasks: system.yml
+  tags: [gpu_llm_system]
+
+- name: Install NVIDIA driver
+  ansible.builtin.import_tasks: nvidia.yml
+  tags: [gpu_llm_nvidia]
+
+- name: Install Docker and NVIDIA Container Toolkit
+  ansible.builtin.import_tasks: docker.yml
+  tags: [gpu_llm_docker]
+
+- name: Deploy vLLM
+  ansible.builtin.import_tasks: vllm.yml
+  tags: [gpu_llm_vllm]
+
+- name: Configure API proxy
+  ansible.builtin.import_tasks: proxy.yml
+  tags: [gpu_llm_proxy]
+
+- name: Install GPU exporter
+  ansible.builtin.import_tasks: monitoring.yml
+  when: gpu_llm_gpu_exporter_enabled | bool
+  tags: [gpu_llm_monitoring]
+
+- name: Verify deployment
+  ansible.builtin.import_tasks: verify.yml
+  when: not ansible_check_mode
+  tags: [gpu_llm_verify]

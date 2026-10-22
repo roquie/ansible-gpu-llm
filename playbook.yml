@@ -1,0 +1,6 @@
+- name: Deploy LLM API server on NVIDIA GPU hosts
+  hosts: gpu_llm
+  become: true
+  gather_facts: true
+  roles:
+    - role: gpu_llm
